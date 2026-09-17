@@ -1,22 +1,32 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
 
-class Restaurant(Base):
-    __tablename__ = "restaurants"
+class Dish(Base):
+    __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         autoincrement=True,
     )
 
+    restaurant_id: Mapped[int] = mapped_column(
+        ForeignKey("restaurants.id"),
+        nullable=False,
+    )
+
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("categories.id"),
+        nullable=False,
+    )
+
     name: Mapped[str] = mapped_column(
-        String(255),
+        String(150),
         nullable=False,
     )
 
@@ -25,17 +35,17 @@ class Restaurant(Base):
         nullable=True,
     )
 
-    address: Mapped[str] = mapped_column(
-        String(255),
+    price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
         nullable=False,
     )
 
-    phone: Mapped[str] = mapped_column(
-        String(50),
+    weight: Mapped[int] = mapped_column(
+        Integer,
         nullable=False,
     )
 
-    is_active: Mapped[bool] = mapped_column(
+    is_available: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=True,
@@ -53,6 +63,3 @@ class Restaurant(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
     )
-
-    rating: Decimal = Decimal("0")
-    reviews_count: int = 0

@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
 from app.schemas.restaurant import (
     RestaurantCreate,
+    RestaurantListResponse,
     RestaurantResponse,
+    RestaurantSalesResponse,
+    RestaurantStatisticsResponse,
     RestaurantUpdate,
 )
 from app.services.restaurant import RestaurantService
@@ -31,14 +36,94 @@ def create_restaurant(
 
 @router.get(
     "",
-    response_model=list[RestaurantResponse],
+    response_model=RestaurantListResponse,
 )
 def get_restaurants(
+    search: str | None = None,
+    is_active: bool | None = None,
+    min_rating: float | None = Query(
+        default=None,
+        ge=0,
+        le=5,
+    ),
+    ordering: str | None = None,
+    page: int = Query(
+        default=1,
+        ge=1,
+    ),
+    page_size: int = Query(
+        default=10,
+        ge=1,
+        le=100,
+    ),
     db: Session = Depends(get_db),
 ):
     service = RestaurantService(db)
 
-    return service.get_all()
+    return service.get_filtered(
+        search=search,
+        is_active=is_active,
+        min_rating=min_rating,
+        ordering=ordering,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/{restaurant_id}/statistics",
+    response_model=RestaurantStatisticsResponse,
+)
+def get_restaurant_statistics(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+):
+    service = RestaurantService(db)
+
+    statistics = service.get_statistics(
+        restaurant_id,
+    )
+
+    if statistics is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Restaurant not found",
+        )
+
+    return statistics
+
+
+@router.get(
+    "/{restaurant_id}/statistics/sales",
+    response_model=RestaurantSalesResponse,
+)
+def get_restaurant_sales(
+    restaurant_id: int,
+    date_from: datetime,
+    date_to: datetime,
+    db: Session = Depends(get_db),
+):
+    service = RestaurantService(db)
+
+    try:
+        sales = service.get_sales(
+            restaurant_id,
+            date_from,
+            date_to,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+    if sales is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Restaurant not found",
+        )
+
+    return sales
 
 
 @router.get(
@@ -51,7 +136,9 @@ def get_restaurant(
 ):
     service = RestaurantService(db)
 
-    restaurant = service.get_by_id(restaurant_id)
+    restaurant = service.get_by_id(
+        restaurant_id,
+    )
 
     if restaurant is None:
         raise HTTPException(
@@ -96,7 +183,9 @@ def delete_restaurant(
 ):
     service = RestaurantService(db)
 
-    deleted = service.delete(restaurant_id)
+    deleted = service.delete(
+        restaurant_id,
+    )
 
     if not deleted:
         raise HTTPException(
