@@ -1,7 +1,10 @@
-from math import ceil
-
 from sqlalchemy.orm import Session
 
+from app.core.filtering import FilterParams
+from app.exceptions import (
+    InvalidDateRangeError,
+    RestaurantNotFoundError,
+)
 from app.models.restaurant import Restaurant
 from app.repositories.restaurant import RestaurantRepository
 from app.schemas.restaurant import RestaurantCreate, RestaurantUpdate
@@ -20,13 +23,17 @@ class RestaurantService:
         page: int = 1,
         page_size: int = 10,
     ):
+        params = FilterParams(
+            page=page,
+            page_size=page_size,
+        )
+
         rows, total = self.repository.get_filtered(
             search=search,
             is_active=is_active,
             min_rating=min_rating,
             ordering=ordering,
-            page=page,
-            page_size=page_size,
+            params=params,
         )
 
         items = []
@@ -36,32 +43,32 @@ class RestaurantService:
             restaurant.reviews_count = reviews_count
             items.append(restaurant)
 
-        pages = ceil(total / page_size) if total else 0
-
         return {
             "items": items,
-            "page": page,
-            "page_size": page_size,
+            "page": params.page,
+            "page_size": params.page_size,
             "total": total,
-            "pages": pages,
+            "pages": params.get_pages(total),
         }
 
     def get_by_id(
         self,
         restaurant_id: int,
-    ) -> Restaurant | None:
-        return self.repository.get_by_id(restaurant_id)
-
-    def get_statistics(
-        self,
-        restaurant_id: int,
-    ):
+    ) -> Restaurant:
         restaurant = self.repository.get_by_id(
             restaurant_id,
         )
 
         if restaurant is None:
-            return None
+            raise RestaurantNotFoundError()
+
+        return restaurant
+
+    def get_statistics(
+        self,
+        restaurant_id: int,
+    ):
+        self.get_by_id(restaurant_id)
 
         return self.repository.get_statistics(
             restaurant_id,
@@ -73,17 +80,10 @@ class RestaurantService:
         date_from,
         date_to,
     ):
-        restaurant = self.repository.get_by_id(
-            restaurant_id,
-        )
-
-        if restaurant is None:
-            return None
+        self.get_by_id(restaurant_id)
 
         if date_from > date_to:
-            raise ValueError(
-                "date_from must be earlier than date_to",
-            )
+            raise InvalidDateRangeError()
 
         sales = self.repository.get_sales(
             restaurant_id,
@@ -114,13 +114,10 @@ class RestaurantService:
         self,
         restaurant_id: int,
         restaurant_data: RestaurantUpdate,
-    ) -> Restaurant | None:
-        restaurant = self.repository.get_by_id(
+    ) -> Restaurant:
+        restaurant = self.get_by_id(
             restaurant_id,
         )
-
-        if restaurant is None:
-            return None
 
         update_data = restaurant_data.model_dump(
             exclude_unset=True,
@@ -135,12 +132,9 @@ class RestaurantService:
         self,
         restaurant_id: int,
     ) -> bool:
-        restaurant = self.repository.get_by_id(
+        restaurant = self.get_by_id(
             restaurant_id,
         )
-
-        if restaurant is None:
-            return False
 
         self.repository.delete(restaurant)
 

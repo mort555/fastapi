@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -8,6 +8,13 @@ from app.models.base import Base
 
 class Review(Base):
     __tablename__ = "reviews"
+
+    __table_args__ = (
+        CheckConstraint(
+            "rating >= 1 AND rating <= 5",
+            name="ck_review_rating",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         primary_key=True,

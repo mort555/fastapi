@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.customer import Customer
 from app.models.dish import Dish
@@ -6,15 +6,25 @@ from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.order_status_history import OrderStatusHistory
 from app.models.restaurant import Restaurant
+from app.repositories.base import BaseRepository
 
 
-class OrderRepository:
+class OrderRepository(BaseRepository[Order]):
+    model = Order
+
     def __init__(self, db: Session):
-        self.db = db
+        super().__init__(db)
 
     def get_all(self) -> list[Order]:
         return (
             self.db.query(Order)
+            .options(
+                joinedload(Order.customer),
+                joinedload(Order.restaurant),
+                joinedload(Order.items).joinedload(
+                    OrderItem.dish,
+                ),
+            )
             .order_by(Order.id)
             .all()
         )
@@ -25,6 +35,13 @@ class OrderRepository:
     ) -> Order | None:
         return (
             self.db.query(Order)
+            .options(
+                joinedload(Order.customer),
+                joinedload(Order.restaurant),
+                joinedload(Order.items).joinedload(
+                    OrderItem.dish,
+                ),
+            )
             .filter(Order.id == order_id)
             .first()
         )

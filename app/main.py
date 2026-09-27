@@ -1,26 +1,42 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-from app.routers.categories import router as categories_router
-from app.routers.customers import router as customers_router
-from app.routers.dishes import router as dishes_router
-from app.routers.orders import router as orders_router
-from app.routers.restaurants import router as restaurants_router
-from app.routers.reviews import router as reviews_router
+from app.exceptions import AppException
+from app.routers import (
+    categories,
+    customers,
+    dishes,
+    orders,
+    restaurants,
+    reviews,
+)
+
 
 app = FastAPI(
     title="FoodHub API",
+    version="0.1.0",
 )
 
-app.include_router(reviews_router)
-app.include_router(restaurants_router)
-app.include_router(categories_router)
-app.include_router(dishes_router)
-app.include_router(customers_router)
-app.include_router(orders_router)
+
+@app.exception_handler(AppException)
+async def app_exception_handler(
+    request: Request,
+    exc: AppException,
+):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+app.include_router(restaurants.router)
+app.include_router(categories.router)
+app.include_router(dishes.router)
+app.include_router(customers.router)
+app.include_router(orders.router)
+app.include_router(reviews.router)
 
 
 @app.get("/")
-async def root():
-    return {
-        "message": "FoodHub API",
-    }
+def root():
+    return {"message": "FoodHub API"}

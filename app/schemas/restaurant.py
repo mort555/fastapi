@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 
 class RestaurantCreate(BaseModel):
@@ -35,6 +35,10 @@ class RestaurantResponse(BaseModel):
         "from_attributes": True,
     }
 
+    @field_serializer("rating")
+    def serialize_rating(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
 
 class RestaurantListResponse(BaseModel):
     items: list[RestaurantResponse]
@@ -44,22 +48,37 @@ class RestaurantListResponse(BaseModel):
     pages: int
 
 
-class RestaurantStatisticsResponse(BaseModel):
-    orders_count: int
-    total_sales: Decimal
-    average_order_price: Decimal
-    top_dishes: list["TopDishResponse"]
-
-
 class TopDishResponse(BaseModel):
     dish_id: int
-    dish_name: str
+    name: str
     quantity: int
-    sales: Decimal
+    revenue: Decimal
+
+
+class RestaurantStatisticsResponse(BaseModel):
+    orders_count: int
+    completed_orders: int
+    cancelled_orders: int
+    revenue: Decimal
+    average_order_price: Decimal
+    average_rating: Decimal
+
+    @field_serializer(
+        "revenue",
+        "average_order_price",
+        "average_rating",
+    )
+    def serialize_decimal(self, value: Decimal) -> str:
+        return f"{value:.2f}"
 
 
 class RestaurantSalesResponse(BaseModel):
     date_from: datetime
     date_to: datetime
-    orders_count: int
-    total_sales: Decimal
+    orders: int
+    revenue: Decimal
+    top_dishes: list[TopDishResponse]
+
+    @field_serializer("revenue")
+    def serialize_revenue(self, value: Decimal) -> str:
+        return f"{value:.2f}"

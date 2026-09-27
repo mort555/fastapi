@@ -20,7 +20,7 @@ class OrderItem(Base):
     )
 
     dish_id: Mapped[int] = mapped_column(
-        ForeignKey("products.id"),
+        ForeignKey("dishes.id"),
         nullable=False,
     )
 
@@ -37,3 +37,13 @@ class OrderItem(Base):
     order: Mapped["Order"] = relationship(
         back_populates="items",
     )
+
+    dish: Mapped["Dish"] = relationship()
+
+    @property
+    def name(self) -> str:
+        return self.dish.name
+
+    @property
+    def subtotal(self) -> Decimal:
+        return self.price * self.quantity

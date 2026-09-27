@@ -1,8 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import ClassVar
 
 from sqlalchemy import Boolean, DateTime, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -54,5 +55,9 @@ class Restaurant(Base):
         onupdate=datetime.utcnow,
     )
 
-    rating: Decimal = Decimal("0")
-    reviews_count: int = 0
+    rating: ClassVar[Decimal] = Decimal("0")
+    reviews_count: ClassVar[int] = 0
+
+    orders: Mapped[list["Order"]] = relationship(
+        back_populates="restaurant",
+    )

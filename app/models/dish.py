@@ -8,7 +8,7 @@ from app.models.base import Base
 
 
 class Dish(Base):
-    __tablename__ = "products"
+    __tablename__ = "dishes"
 
     id: Mapped[int] = mapped_column(
         primary_key=True,

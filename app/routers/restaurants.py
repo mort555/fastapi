@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.core.filtering import FilterParams
 from app.dependencies import get_db
 from app.schemas.restaurant import (
     RestaurantCreate,
@@ -21,19 +22,6 @@ router = APIRouter(
 )
 
 
-@router.post(
-    "",
-    response_model=RestaurantResponse,
-)
-def create_restaurant(
-    restaurant_data: RestaurantCreate,
-    db: Session = Depends(get_db),
-):
-    service = RestaurantService(db)
-
-    return service.create(restaurant_data)
-
-
 @router.get(
     "",
     response_model=RestaurantListResponse,
@@ -41,21 +29,10 @@ def create_restaurant(
 def get_restaurants(
     search: str | None = None,
     is_active: bool | None = None,
-    min_rating: float | None = Query(
-        default=None,
-        ge=0,
-        le=5,
-    ),
+    min_rating: float | None = None,
     ordering: str | None = None,
-    page: int = Query(
-        default=1,
-        ge=1,
-    ),
-    page_size: int = Query(
-        default=10,
-        ge=1,
-        le=100,
-    ),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     service = RestaurantService(db)
@@ -70,6 +47,71 @@ def get_restaurants(
     )
 
 
+@router.post(
+    "",
+    response_model=RestaurantResponse,
+)
+def create_restaurant(
+    restaurant_data: RestaurantCreate,
+    db: Session = Depends(get_db),
+):
+    service = RestaurantService(db)
+
+    return service.create(
+        restaurant_data,
+    )
+
+
+@router.get(
+    "/{restaurant_id}",
+    response_model=RestaurantResponse,
+)
+def get_restaurant(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+):
+    service = RestaurantService(db)
+
+    return service.get_by_id(
+        restaurant_id,
+    )
+
+
+@router.patch(
+    "/{restaurant_id}",
+    response_model=RestaurantResponse,
+)
+def update_restaurant(
+    restaurant_id: int,
+    restaurant_data: RestaurantUpdate,
+    db: Session = Depends(get_db),
+):
+    service = RestaurantService(db)
+
+    return service.update(
+        restaurant_id,
+        restaurant_data,
+    )
+
+
+@router.delete(
+    "/{restaurant_id}",
+)
+def delete_restaurant(
+    restaurant_id: int,
+    db: Session = Depends(get_db),
+):
+    service = RestaurantService(db)
+
+    service.delete(
+        restaurant_id,
+    )
+
+    return {
+        "message": "Restaurant deleted successfully",
+    }
+
+
 @router.get(
     "/{restaurant_id}/statistics",
     response_model=RestaurantStatisticsResponse,
@@ -80,17 +122,9 @@ def get_restaurant_statistics(
 ):
     service = RestaurantService(db)
 
-    statistics = service.get_statistics(
+    return service.get_statistics(
         restaurant_id,
     )
-
-    if statistics is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Restaurant not found",
-        )
-
-    return statistics
 
 
 @router.get(
@@ -105,94 +139,8 @@ def get_restaurant_sales(
 ):
     service = RestaurantService(db)
 
-    try:
-        sales = service.get_sales(
-            restaurant_id,
-            date_from,
-            date_to,
-        )
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        )
-
-    if sales is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Restaurant not found",
-        )
-
-    return sales
-
-
-@router.get(
-    "/{restaurant_id}",
-    response_model=RestaurantResponse,
-)
-def get_restaurant(
-    restaurant_id: int,
-    db: Session = Depends(get_db),
-):
-    service = RestaurantService(db)
-
-    restaurant = service.get_by_id(
+    return service.get_sales(
         restaurant_id,
+        date_from,
+        date_to,
     )
-
-    if restaurant is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Restaurant not found",
-        )
-
-    return restaurant
-
-
-@router.patch(
-    "/{restaurant_id}",
-    response_model=RestaurantResponse,
-)
-def update_restaurant(
-    restaurant_id: int,
-    restaurant_data: RestaurantUpdate,
-    db: Session = Depends(get_db),
-):
-    service = RestaurantService(db)
-
-    restaurant = service.update(
-        restaurant_id,
-        restaurant_data,
-    )
-
-    if restaurant is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Restaurant not found",
-        )
-
-    return restaurant
-
-
-@router.delete(
-    "/{restaurant_id}",
-)
-def delete_restaurant(
-    restaurant_id: int,
-    db: Session = Depends(get_db),
-):
-    service = RestaurantService(db)
-
-    deleted = service.delete(
-        restaurant_id,
-    )
-
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Restaurant not found",
-        )
-
-    return {
-        "message": "Restaurant deleted successfully",
-    }

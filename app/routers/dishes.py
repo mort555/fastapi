@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -14,6 +14,7 @@ from app.services.dish import DishService
 
 
 router = APIRouter(
+    prefix="",
     tags=["Dishes"],
 )
 
@@ -29,18 +30,10 @@ def create_dish(
 ):
     service = DishService(db)
 
-    dish = service.create(
+    return service.create(
         restaurant_id,
         dish_data,
     )
-
-    if dish is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Category not found in this restaurant",
-        )
-
-    return dish
 
 
 @router.get(
@@ -49,19 +42,19 @@ def create_dish(
 )
 def get_dishes(
     restaurant_id: int,
-    category_id: int | None = Query(None),
-    min_price: Decimal | None = Query(None),
-    max_price: Decimal | None = Query(None),
-    is_available: bool | None = Query(None),
-    search: str | None = Query(None),
-    ordering: str | None = Query(None),
+    category_id: int | None = None,
+    min_price: Decimal | None = None,
+    max_price: Decimal | None = None,
+    is_available: bool | None = None,
+    search: str | None = None,
+    ordering: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     service = DishService(db)
 
-    return service.get_filtered_by_restaurant(
+    return service.get_all_by_restaurant(
         restaurant_id=restaurant_id,
         category_id=category_id,
         min_price=min_price,
@@ -84,15 +77,9 @@ def get_dish(
 ):
     service = DishService(db)
 
-    dish = service.get_by_id(dish_id)
-
-    if dish is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Dish not found",
-        )
-
-    return dish
+    return service.get_by_id(
+        dish_id,
+    )
 
 
 @router.patch(
@@ -106,18 +93,10 @@ def update_dish(
 ):
     service = DishService(db)
 
-    dish = service.update(
+    return service.update(
         dish_id,
         dish_data,
     )
-
-    if dish is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Dish not found",
-        )
-
-    return dish
 
 
 @router.delete(
@@ -129,13 +108,9 @@ def delete_dish(
 ):
     service = DishService(db)
 
-    deleted = service.delete(dish_id)
-
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Dish not found",
-        )
+    service.delete(
+        dish_id,
+    )
 
     return {
         "message": "Dish deleted successfully",

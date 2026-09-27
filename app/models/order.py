@@ -49,11 +49,16 @@ class Order(Base):
         onupdate=datetime.utcnow,
     )
 
+    customer: Mapped["Customer"] = relationship()
+
+    restaurant: Mapped["Restaurant"] = relationship()
+
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order",
         cascade="all, delete-orphan",
     )
+
     status_history: Mapped[list["OrderStatusHistory"]] = relationship(
-    back_populates="order",
-    cascade="all, delete-orphan",
+        back_populates="order",
+        cascade="all, delete-orphan",
     )

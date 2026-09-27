@@ -1,22 +1,16 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.filtering import FilterParams
 from app.models.dish import Dish
+from app.repositories.base import BaseRepository
 
 
-class DishRepository:
+class DishRepository(BaseRepository[Dish]):
+    model = Dish
+
     def __init__(self, db: Session):
-        self.db = db
-
-    def get_by_id(
-        self,
-        dish_id: int,
-    ) -> Dish | None:
-        return (
-            self.db.query(Dish)
-            .filter(Dish.id == dish_id)
-            .first()
-        )
+        super().__init__(db)
 
     def get_filtered_by_restaurant(
         self,
@@ -27,9 +21,10 @@ class DishRepository:
         is_available: bool | None = None,
         search: str | None = None,
         ordering: str | None = None,
-        page: int = 1,
-        page_size: int = 10,
+        params: FilterParams | None = None,
     ) -> tuple[list[Dish], int]:
+        if params is None:
+            params = FilterParams()
 
         query = self.db.query(Dish).filter(
             Dish.restaurant_id == restaurant_id,
@@ -62,8 +57,6 @@ class DishRepository:
                 Dish.name.ilike(search_pattern),
             )
 
-        # Считаем количество отдельно,
-        # пока сортировка еще не применена.
         total = query.with_entities(
             func.count(Dish.id),
         ).scalar() or 0
@@ -89,39 +82,11 @@ class DishRepository:
         else:
             query = query.order_by(Dish.id)
 
-        offset = (page - 1) * page_size
-
         dishes = (
             query
-            .offset(offset)
-            .limit(page_size)
+            .offset(params.offset)
+            .limit(params.page_size)
             .all()
         )
 
         return dishes, total
-
-    def create(
-        self,
-        dish: Dish,
-    ) -> Dish:
-        self.db.add(dish)
-        self.db.commit()
-        self.db.refresh(dish)
-
-        return dish
-
-    def update(
-        self,
-        dish: Dish,
-    ) -> Dish:
-        self.db.commit()
-        self.db.refresh(dish)
-
-        return dish
-
-    def delete(
-        self,
-        dish: Dish,
-    ) -> None:
-        self.db.delete(dish)
-        self.db.commit()

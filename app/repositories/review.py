@@ -2,11 +2,14 @@ from sqlalchemy.orm import Session
 
 from app.models.order import Order
 from app.models.review import Review
+from app.repositories.base import BaseRepository
 
 
-class ReviewRepository:
+class ReviewRepository(BaseRepository[Review]):
+    model = Review
+
     def __init__(self, db: Session):
-        self.db = db
+        super().__init__(db)
 
     def get_all_by_restaurant(
         self,
@@ -19,16 +22,6 @@ class ReviewRepository:
             )
             .order_by(Review.id)
             .all()
-        )
-
-    def get_by_id(
-        self,
-        review_id: int,
-    ) -> Review | None:
-        return (
-            self.db.query(Review)
-            .filter(Review.id == review_id)
-            .first()
         )
 
     def customer_has_order(
@@ -45,20 +38,3 @@ class ReviewRepository:
             .first()
             is not None
         )
-
-    def create(
-        self,
-        review: Review,
-    ) -> Review:
-        self.db.add(review)
-        self.db.commit()
-        self.db.refresh(review)
-
-        return review
-
-    def delete(
-        self,
-        review: Review,
-    ) -> None:
-        self.db.delete(review)
-        self.db.commit()

@@ -1,26 +1,20 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.filtering import FilterParams
 from app.models.dish import Dish
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.restaurant import Restaurant
 from app.models.review import Review
+from app.repositories.base import BaseRepository
 
 
-class RestaurantRepository:
+class RestaurantRepository(BaseRepository[Restaurant]):
+    model = Restaurant
+
     def __init__(self, db: Session):
-        self.db = db
-
-    def get_by_id(
-        self,
-        restaurant_id: int,
-    ) -> Restaurant | None:
-        return (
-            self.db.query(Restaurant)
-            .filter(Restaurant.id == restaurant_id)
-            .first()
-        )
+        super().__init__(db)
 
     def get_filtered(
         self,
@@ -28,9 +22,11 @@ class RestaurantRepository:
         is_active: bool | None = None,
         min_rating: float | None = None,
         ordering: str | None = None,
-        page: int = 1,
-        page_size: int = 10,
+        params: FilterParams | None = None,
     ):
+        if params is None:
+            params = FilterParams()
+
         review_stats = (
             self.db.query(
                 Review.restaurant_id.label("restaurant_id"),
@@ -108,22 +104,20 @@ class RestaurantRepository:
         else:
             query = query.order_by(Restaurant.id)
 
-        offset = (page - 1) * page_size
-
         rows = (
             query
-            .offset(offset)
-            .limit(page_size)
+            .offset(params.offset)
+            .limit(params.page_size)
             .all()
         )
 
         return rows, total
 
-    def get_statistics(
+    def _get_orders_count(
         self,
         restaurant_id: int,
-    ):
-        orders_count = (
+    ) -> int:
+        return (
             self.db.query(func.count(Order.id))
             .filter(
                 Order.restaurant_id == restaurant_id,
@@ -132,7 +126,39 @@ class RestaurantRepository:
             or 0
         )
 
-        total_sales = (
+    def _get_completed_orders_count(
+        self,
+        restaurant_id: int,
+    ) -> int:
+        return (
+            self.db.query(func.count(Order.id))
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.status == "COMPLETED",
+            )
+            .scalar()
+            or 0
+        )
+
+    def _get_cancelled_orders_count(
+        self,
+        restaurant_id: int,
+    ) -> int:
+        return (
+            self.db.query(func.count(Order.id))
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.status == "CANCELLED",
+            )
+            .scalar()
+            or 0
+        )
+
+    def _get_revenue(
+        self,
+        restaurant_id: int,
+    ):
+        return (
             self.db.query(
                 func.coalesce(
                     func.sum(Order.total_price),
@@ -145,7 +171,11 @@ class RestaurantRepository:
             .scalar()
         )
 
-        average_order_price = (
+    def _get_average_order_price(
+        self,
+        restaurant_id: int,
+    ):
+        return (
             self.db.query(
                 func.coalesce(
                     func.avg(Order.total_price),
@@ -158,46 +188,46 @@ class RestaurantRepository:
             .scalar()
         )
 
-        top_dishes = (
+    def _get_average_rating(
+        self,
+        restaurant_id: int,
+    ):
+        return (
             self.db.query(
-                Dish.id.label("dish_id"),
-                Dish.name.label("dish_name"),
-                func.sum(
-                    OrderItem.quantity,
-                ).label("quantity"),
-                func.sum(
-                    OrderItem.quantity * OrderItem.price,
-                ).label("sales"),
-            )
-            .join(
-                OrderItem,
-                OrderItem.dish_id == Dish.id,
-            )
-            .join(
-                Order,
-                Order.id == OrderItem.order_id,
+                func.coalesce(
+                    func.avg(Review.rating),
+                    0,
+                ),
             )
             .filter(
-                Order.restaurant_id == restaurant_id,
+                Review.restaurant_id == restaurant_id,
             )
-            .group_by(
-                Dish.id,
-                Dish.name,
-            )
-            .order_by(
-                func.sum(
-                    OrderItem.quantity,
-                ).desc(),
-            )
-            .limit(10)
-            .all()
+            .scalar()
         )
 
+    def get_statistics(
+        self,
+        restaurant_id: int,
+    ):
         return {
-            "orders_count": orders_count,
-            "total_sales": total_sales,
-            "average_order_price": average_order_price,
-            "top_dishes": top_dishes,
+            "orders_count": self._get_orders_count(
+                restaurant_id,
+            ),
+            "completed_orders": self._get_completed_orders_count(
+                restaurant_id,
+            ),
+            "cancelled_orders": self._get_cancelled_orders_count(
+                restaurant_id,
+            ),
+            "revenue": self._get_revenue(
+                restaurant_id,
+            ),
+            "average_order_price": self._get_average_order_price(
+                restaurant_id,
+            ),
+            "average_rating": self._get_average_rating(
+                restaurant_id,
+            ),
         }
 
     def get_sales(
@@ -217,7 +247,7 @@ class RestaurantRepository:
 
         orders_count = orders_query.count()
 
-        total_sales = (
+        revenue = (
             orders_query.with_entities(
                 func.coalesce(
                     func.sum(Order.total_price),
@@ -227,33 +257,45 @@ class RestaurantRepository:
             .scalar()
         )
 
+        top_dishes = (
+            self.db.query(
+                Dish.id.label("dish_id"),
+                Dish.name.label("name"),
+                func.sum(
+                    OrderItem.quantity,
+                ).label("quantity"),
+                func.sum(
+                    OrderItem.quantity * OrderItem.price,
+                ).label("revenue"),
+            )
+            .join(
+                OrderItem,
+                OrderItem.dish_id == Dish.id,
+            )
+            .join(
+                Order,
+                Order.id == OrderItem.order_id,
+            )
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.created_at >= date_from,
+                Order.created_at <= date_to,
+            )
+            .group_by(
+                Dish.id,
+                Dish.name,
+            )
+            .order_by(
+                func.sum(
+                    OrderItem.quantity,
+                ).desc(),
+            )
+            .limit(10)
+            .all()
+        )
+
         return {
-            "orders_count": orders_count,
-            "total_sales": total_sales,
+            "orders": orders_count,
+            "revenue": revenue,
+            "top_dishes": top_dishes,
         }
-
-    def create(
-        self,
-        restaurant: Restaurant,
-    ) -> Restaurant:
-        self.db.add(restaurant)
-        self.db.commit()
-        self.db.refresh(restaurant)
-
-        return restaurant
-
-    def update(
-        self,
-        restaurant: Restaurant,
-    ) -> Restaurant:
-        self.db.commit()
-        self.db.refresh(restaurant)
-
-        return restaurant
-
-    def delete(
-        self,
-        restaurant: Restaurant,
-    ) -> None:
-        self.db.delete(restaurant)
-        self.db.commit()

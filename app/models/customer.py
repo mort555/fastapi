@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import DateTime, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -40,4 +40,8 @@ class Customer(Base):
         DateTime,
         nullable=False,
         default=datetime.utcnow,
+    )
+
+    orders: Mapped[list["Order"]] = relationship(
+        back_populates="customer",
     )

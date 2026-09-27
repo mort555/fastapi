@@ -1,5 +1,5 @@
 from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -33,4 +33,8 @@ class Category(Base):
     description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+
+    dishes: Mapped[list["Dish"]] = relationship(
+        back_populates="category",
     )

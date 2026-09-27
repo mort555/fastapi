@@ -1,11 +1,14 @@
 from sqlalchemy.orm import Session
 
 from app.models.category import Category
+from app.repositories.base import BaseRepository
 
 
-class CategoryRepository:
+class CategoryRepository(BaseRepository[Category]):
+    model = Category
+
     def __init__(self, db: Session):
-        self.db = db
+        super().__init__(db)
 
     def get_all_by_restaurant(
         self,
@@ -16,30 +19,3 @@ class CategoryRepository:
             .filter(Category.restaurant_id == restaurant_id)
             .all()
         )
-
-    def get_by_id(
-        self,
-        category_id: int,
-    ) -> Category | None:
-        return (
-            self.db.query(Category)
-            .filter(Category.id == category_id)
-            .first()
-        )
-
-    def create(self, category: Category) -> Category:
-        self.db.add(category)
-        self.db.commit()
-        self.db.refresh(category)
-
-        return category
-
-    def update(self, category: Category) -> Category:
-        self.db.commit()
-        self.db.refresh(category)
-
-        return category
-
-    def delete(self, category: Category) -> None:
-        self.db.delete(category)
-        self.db.commit()

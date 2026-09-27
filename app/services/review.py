@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.exceptions import ReviewNotAllowedError, ReviewNotFoundError
 from app.models.review import Review
 from app.repositories.review import ReviewRepository
 from app.schemas.review import ReviewCreate
@@ -20,23 +21,27 @@ class ReviewService:
     def get_by_id(
         self,
         review_id: int,
-    ) -> Review | None:
-        return self.repository.get_by_id(review_id)
+    ) -> Review:
+        review = self.repository.get_by_id(
+            review_id,
+        )
+
+        if review is None:
+            raise ReviewNotFoundError()
+
+        return review
 
     def create(
         self,
         review_data: ReviewCreate,
     ) -> Review:
-
         has_order = self.repository.customer_has_order(
             customer_id=review_data.customer_id,
             restaurant_id=review_data.restaurant_id,
         )
 
         if not has_order:
-            raise ValueError(
-                "Customer has no orders in this restaurant",
-            )
+            raise ReviewNotAllowedError()
 
         review = Review(
             customer_id=review_data.customer_id,
@@ -51,10 +56,9 @@ class ReviewService:
         self,
         review_id: int,
     ) -> bool:
-        review = self.repository.get_by_id(review_id)
-
-        if review is None:
-            return False
+        review = self.get_by_id(
+            review_id,
+        )
 
         self.repository.delete(review)
 

@@ -19,12 +19,32 @@ class OrderStatusUpdate(BaseModel):
     status: str
 
 
+class CustomerMiniResponse(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class RestaurantMiniResponse(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
 class OrderItemResponse(BaseModel):
     id: int
     order_id: int
     dish_id: int
+    name: str
     quantity: int
     price: Decimal
+    subtotal: Decimal
 
     model_config = {
         "from_attributes": True,
@@ -45,15 +65,14 @@ class OrderStatusHistoryResponse(BaseModel):
 
 class OrderResponse(BaseModel):
     id: int
-    customer_id: int
-    restaurant_id: int
+    customer: CustomerMiniResponse
+    restaurant: RestaurantMiniResponse
     status: str
-    total_price: Decimal
-    created_at: datetime
-    updated_at: datetime
     items: list[OrderItemResponse] = Field(
         default_factory=list,
     )
+    total_price: Decimal
+    created_at: datetime
 
     model_config = {
         "from_attributes": True,

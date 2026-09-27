@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -22,13 +22,9 @@ def create_review(
 ):
     service = ReviewService(db)
 
-    try:
-        return service.create(review_data)
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        )
+    return service.create(
+        review_data,
+    )
 
 
 @router.get(
@@ -56,15 +52,9 @@ def get_review(
 ):
     service = ReviewService(db)
 
-    review = service.get_by_id(review_id)
-
-    if review is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Review not found",
-        )
-
-    return review
+    return service.get_by_id(
+        review_id,
+    )
 
 
 @router.delete(
@@ -76,13 +66,9 @@ def delete_review(
 ):
     service = ReviewService(db)
 
-    deleted = service.delete(review_id)
-
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Review not found",
-        )
+    service.delete(
+        review_id,
+    )
 
     return {
         "message": "Review deleted successfully",

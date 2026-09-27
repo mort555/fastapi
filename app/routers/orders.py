@@ -2,13 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
-from app.schemas.order import OrderCreate, OrderResponse
-from app.services.order import OrderService
 from app.schemas.order import (
     OrderCreate,
     OrderResponse,
     OrderStatusUpdate,
 )
+from app.services.order import OrderService
 
 
 router = APIRouter(
@@ -27,15 +26,7 @@ def create_order(
 ):
     service = OrderService(db)
 
-    try:
-        order = service.create(order_data)
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        )
-
-    return order
+    return service.create(order_data)
 
 
 @router.get(
@@ -69,6 +60,8 @@ def get_order(
         )
 
     return order
+
+
 @router.patch(
     "/{order_id}/status",
     response_model=OrderResponse,
@@ -80,22 +73,7 @@ def change_order_status(
 ):
     service = OrderService(db)
 
-    try:
-        return service.change_status(
-            order_id,
-            status_data.status,
-        )
-    except ValueError as error:
-        message = str(error)
-
-        if message == "Order not found":
-            raise HTTPException(
-                status_code=404,
-                detail=message,
-            )
-
-        raise HTTPException(
-            status_code=400,
-            detail=message,
-        )
-    
+    return service.change_status(
+        order_id,
+        status_data.status,
+    )
