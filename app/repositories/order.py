@@ -1,5 +1,8 @@
+
+
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.filtering import FilterMixin, OrderFilterParams
 from app.models.customer import Customer
 from app.models.dish import Dish
 from app.models.order import Order
@@ -9,22 +12,27 @@ from app.models.restaurant import Restaurant
 from app.repositories.base import BaseRepository
 
 
-class OrderRepository(BaseRepository[Order]):
+class OrderRepository(
+    BaseRepository[Order],
+    FilterMixin,
+):
     model = Order
 
     def __init__(self, db: Session):
         super().__init__(db)
 
+    def _get_order_query(self):
+        return self.db.query(Order).options(
+            joinedload(Order.customer),
+            joinedload(Order.restaurant),
+            joinedload(Order.items).joinedload(
+                OrderItem.dish,
+            ),
+        )
+
     def get_all(self) -> list[Order]:
         return (
-            self.db.query(Order)
-            .options(
-                joinedload(Order.customer),
-                joinedload(Order.restaurant),
-                joinedload(Order.items).joinedload(
-                    OrderItem.dish,
-                ),
-            )
+            self._get_order_query()
             .order_by(Order.id)
             .all()
         )
@@ -34,17 +42,66 @@ class OrderRepository(BaseRepository[Order]):
         order_id: int,
     ) -> Order | None:
         return (
-            self.db.query(Order)
-            .options(
-                joinedload(Order.customer),
-                joinedload(Order.restaurant),
-                joinedload(Order.items).joinedload(
-                    OrderItem.dish,
-                ),
-            )
+            self._get_order_query()
             .filter(Order.id == order_id)
             .first()
         )
+
+    def get_filtered(
+        self,
+        params: OrderFilterParams,
+    ) -> tuple[list[Order], int]:
+        query = self._get_order_query()
+
+        if params.status:
+            query = query.filter(
+                Order.status == params.status.upper(),
+            )
+
+        if params.customer_id is not None:
+            query = query.filter(
+                Order.customer_id == params.customer_id,
+            )
+
+        if params.restaurant_id is not None:
+            query = query.filter(
+                Order.restaurant_id == params.restaurant_id,
+            )
+
+        if params.date_from is not None:
+            query = query.filter(
+                Order.created_at >= params.date_from,
+            )
+
+        if params.date_to is not None:
+            query = query.filter(
+                Order.created_at <= params.date_to,
+            )
+
+        allowed_fields = {
+            "id": Order.id,
+            "created_at": Order.created_at,
+            "total_price": Order.total_price,
+            "status": Order.status,
+        }
+
+        query = self.apply_ordering(
+            query,
+            params.ordering,
+            allowed_fields,
+            Order.id,
+        )
+
+        total = query.order_by(None).count()
+
+        items = (
+            query
+            .offset(params.offset)
+            .limit(params.page_size)
+            .all()
+        )
+
+        return items, total
 
     def get_customer(
         self,
@@ -82,7 +139,6 @@ class OrderRepository(BaseRepository[Order]):
     ) -> Order:
         self.db.add(order)
         self.db.flush()
-
         return order
 
     def create_order_item(
@@ -91,7 +147,6 @@ class OrderRepository(BaseRepository[Order]):
     ) -> OrderItem:
         self.db.add(order_item)
         self.db.flush()
-
         return order_item
 
     def create_status_history(
@@ -100,7 +155,6 @@ class OrderRepository(BaseRepository[Order]):
     ) -> OrderStatusHistory:
         self.db.add(history)
         self.db.flush()
-
         return history
 
     def commit(self) -> None:

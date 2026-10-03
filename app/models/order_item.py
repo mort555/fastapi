@@ -38,7 +38,9 @@ class OrderItem(Base):
         back_populates="items",
     )
 
-    dish: Mapped["Dish"] = relationship()
+    dish: Mapped["Dish"] = relationship(
+        back_populates="order_items",
+    )
 
     @property
     def name(self) -> str:

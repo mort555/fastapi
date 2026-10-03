@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.core.filtering import FilterParams
+from app.core.filtering import DishFilterParams
 from app.exceptions import (
     CategoryNotFoundError,
     DishNotFoundError,
@@ -61,20 +61,20 @@ class DishService:
             restaurant_id,
         )
 
-        params = FilterParams(
+        params = DishFilterParams(
+            search=search,
+            ordering=ordering,
             page=page,
             page_size=page_size,
+            category_id=category_id,
+            min_price=min_price,
+            max_price=max_price,
+            is_available=is_available,
         )
 
         dishes, total = (
             self.repository.get_filtered_by_restaurant(
                 restaurant_id=restaurant_id,
-                category_id=category_id,
-                min_price=min_price,
-                max_price=max_price,
-                is_available=is_available,
-                search=search,
-                ordering=ordering,
                 params=params,
             )
         )

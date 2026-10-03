@@ -19,7 +19,7 @@ class OrderStatusUpdate(BaseModel):
     status: str
 
 
-class CustomerMiniResponse(BaseModel):
+class CustomerInOrderResponse(BaseModel):
     id: int
     name: str
 
@@ -28,7 +28,7 @@ class CustomerMiniResponse(BaseModel):
     }
 
 
-class RestaurantMiniResponse(BaseModel):
+class RestaurantInOrderResponse(BaseModel):
     id: int
     name: str
 
@@ -65,8 +65,8 @@ class OrderStatusHistoryResponse(BaseModel):
 
 class OrderResponse(BaseModel):
     id: int
-    customer: CustomerMiniResponse
-    restaurant: RestaurantMiniResponse
+    customer: CustomerInOrderResponse
+    restaurant: RestaurantInOrderResponse
     status: str
     items: list[OrderItemResponse] = Field(
         default_factory=list,

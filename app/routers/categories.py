@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -57,15 +57,7 @@ def get_category(
 ):
     service = CategoryService(db)
 
-    category = service.get_by_id(category_id)
-
-    if category is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Category not found",
-        )
-
-    return category
+    return service.get_by_id(category_id)
 
 
 @router.patch(
@@ -79,18 +71,10 @@ def update_category(
 ):
     service = CategoryService(db)
 
-    category = service.update(
+    return service.update(
         category_id,
         category_data,
     )
-
-    if category is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Category not found",
-        )
-
-    return category
 
 
 @router.delete(
@@ -102,13 +86,7 @@ def delete_category(
 ):
     service = CategoryService(db)
 
-    deleted = service.delete(category_id)
-
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Category not found",
-        )
+    service.delete(category_id)
 
     return {
         "message": "Category deleted successfully",

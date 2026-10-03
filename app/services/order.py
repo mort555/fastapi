@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.core.filtering import OrderFilterParams
 from app.exceptions import (
     CustomerNotFoundError,
     DishNotAvailableError,
@@ -18,7 +19,6 @@ from app.models.order_status_history import OrderStatusHistory
 from app.repositories.order import OrderRepository
 from app.schemas.order import OrderCreate
 
-
 ALLOWED_TRANSITIONS = {
     "NEW": {"CONFIRMED", "CANCELLED"},
     "CONFIRMED": {"COOKING", "CANCELLED"},
@@ -33,8 +33,21 @@ class OrderService:
     def __init__(self, db: Session):
         self.repository = OrderRepository(db)
 
-    def get_all(self) -> list[Order]:
-        return self.repository.get_all()
+    def get_filtered(
+        self,
+        params: OrderFilterParams,
+    ) -> dict:
+        orders, total = self.repository.get_filtered(
+            params,
+        )
+
+        return {
+            "items": orders,
+            "page": params.page,
+            "page_size": params.page_size,
+            "total": total,
+            "pages": params.get_pages(total),
+        }
 
     def get_by_id(
         self,
@@ -90,7 +103,7 @@ class OrderService:
             customer_id=order_data.customer_id,
             restaurant_id=order_data.restaurant_id,
             status="NEW",
-            total_price=Decimal("0"),
+            total_price=Decimal(0),
         )
 
         self.repository.create_order(order)
@@ -145,7 +158,7 @@ class OrderService:
             order_data.restaurant_id,
         )
 
-        total_price = Decimal("0")
+        total_price = Decimal(0)
 
         try:
             order = self._create_order(

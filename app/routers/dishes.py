@@ -1,8 +1,7 @@
-from decimal import Decimal
-
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.filtering import DishFilterParams
 from app.dependencies import get_db
 from app.schemas.dish import (
     DishCreate,
@@ -42,28 +41,21 @@ def create_dish(
 )
 def get_dishes(
     restaurant_id: int,
-    category_id: int | None = None,
-    min_price: Decimal | None = None,
-    max_price: Decimal | None = None,
-    is_available: bool | None = None,
-    search: str | None = None,
-    ordering: str | None = None,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    params: DishFilterParams = Depends(),
     db: Session = Depends(get_db),
 ):
     service = DishService(db)
 
     return service.get_all_by_restaurant(
         restaurant_id=restaurant_id,
-        category_id=category_id,
-        min_price=min_price,
-        max_price=max_price,
-        is_available=is_available,
-        search=search,
-        ordering=ordering,
-        page=page,
-        page_size=page_size,
+        category_id=params.category_id,
+        min_price=params.min_price,
+        max_price=params.max_price,
+        is_available=params.is_available,
+        search=params.search,
+        ordering=params.ordering,
+        page=params.page,
+        page_size=params.page_size,
     )
 
 

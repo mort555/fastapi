@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.core.filtering import ReviewFilterParams
 from app.exceptions import ReviewNotAllowedError, ReviewNotFoundError
 from app.models.review import Review
 from app.repositories.review import ReviewRepository
@@ -9,6 +10,22 @@ from app.schemas.review import ReviewCreate
 class ReviewService:
     def __init__(self, db: Session):
         self.repository = ReviewRepository(db)
+
+    def get_filtered(
+        self,
+        params: ReviewFilterParams,
+    ) -> dict:
+        reviews, total = self.repository.get_filtered(
+            params,
+        )
+
+        return {
+            "items": reviews,
+            "page": params.page,
+            "page_size": params.page_size,
+            "total": total,
+            "pages": params.get_pages(total),
+        }
 
     def get_all_by_restaurant(
         self,
@@ -50,7 +67,9 @@ class ReviewService:
             text=review_data.text,
         )
 
-        return self.repository.create(review)
+        return self.repository.create(
+            review,
+        )
 
     def delete(
         self,
@@ -60,6 +79,8 @@ class ReviewService:
             review_id,
         )
 
-        self.repository.delete(review)
+        self.repository.delete(
+            review,
+        )
 
         return True

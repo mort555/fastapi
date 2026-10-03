@@ -49,9 +49,13 @@ class Order(Base):
         onupdate=datetime.utcnow,
     )
 
-    customer: Mapped["Customer"] = relationship()
+    customer: Mapped["Customer"] = relationship(
+        back_populates="orders",
+    )
 
-    restaurant: Mapped["Restaurant"] = relationship()
+    restaurant: Mapped["Restaurant"] = relationship(
+        back_populates="orders",
+    )
 
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order",

@@ -37,6 +37,15 @@ class ValidationError(AppException):
     detail = "Validation error"
 
 
+class ConflictError(AppException):
+    status_code = 409
+    detail = "Resource conflict"
+
+
+class CustomerEmailAlreadyExistsError(ConflictError):
+    detail = "Customer with this email already exists"
+
+
 class DishNotAvailableError(ValidationError):
     detail = "Dish is not available"
 

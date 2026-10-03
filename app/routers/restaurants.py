@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.filtering import FilterParams
+from app.core.filtering import RestaurantFilterParams
 from app.dependencies import get_db
 from app.schemas.restaurant import (
     RestaurantCreate,
@@ -27,23 +27,18 @@ router = APIRouter(
     response_model=RestaurantListResponse,
 )
 def get_restaurants(
-    search: str | None = None,
-    is_active: bool | None = None,
-    min_rating: float | None = None,
-    ordering: str | None = None,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    params: RestaurantFilterParams = Depends(),
     db: Session = Depends(get_db),
 ):
     service = RestaurantService(db)
 
     return service.get_filtered(
-        search=search,
-        is_active=is_active,
-        min_rating=min_rating,
-        ordering=ordering,
-        page=page,
-        page_size=page_size,
+        search=params.search,
+        is_active=params.is_active,
+        min_rating=params.min_rating,
+        ordering=params.ordering,
+        page=params.page,
+        page_size=params.page_size,
     )
 
 

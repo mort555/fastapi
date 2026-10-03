@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.core.filtering import FilterParams
+from app.core.filtering import RestaurantFilterParams
 from app.exceptions import (
     InvalidDateRangeError,
     RestaurantNotFoundError,
@@ -23,17 +23,17 @@ class RestaurantService:
         page: int = 1,
         page_size: int = 10,
     ):
-        params = FilterParams(
+        params = RestaurantFilterParams(
+            search=search,
+            ordering=ordering,
             page=page,
             page_size=page_size,
+            is_active=is_active,
+            min_rating=min_rating,
         )
 
         rows, total = self.repository.get_filtered(
-            search=search,
-            is_active=is_active,
-            min_rating=min_rating,
-            ordering=ordering,
-            params=params,
+            params,
         )
 
         items = []
@@ -108,7 +108,9 @@ class RestaurantService:
             phone=restaurant_data.phone,
         )
 
-        return self.repository.create(restaurant)
+        return self.repository.create(
+            restaurant,
+        )
 
     def update(
         self,
@@ -124,9 +126,15 @@ class RestaurantService:
         )
 
         for field, value in update_data.items():
-            setattr(restaurant, field, value)
+            setattr(
+                restaurant,
+                field,
+                value,
+            )
 
-        return self.repository.update(restaurant)
+        return self.repository.update(
+            restaurant,
+        )
 
     def delete(
         self,
@@ -136,6 +144,8 @@ class RestaurantService:
             restaurant_id,
         )
 
-        self.repository.delete(restaurant)
+        self.repository.delete(
+            restaurant,
+        )
 
         return True

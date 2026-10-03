@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.filtering import ReviewFilterParams
 from app.dependencies import get_db
 from app.schemas.review import ReviewCreate, ReviewResponse
 from app.services.review import ReviewService
@@ -24,6 +25,20 @@ def create_review(
 
     return service.create(
         review_data,
+    )
+
+
+@router.get(
+    "",
+)
+def get_reviews(
+    params: ReviewFilterParams = Depends(),
+    db: Session = Depends(get_db),
+):
+    service = ReviewService(db)
+
+    return service.get_filtered(
+        params,
     )
 
 

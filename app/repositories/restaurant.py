@@ -1,7 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.filtering import FilterParams
+from app.core.filtering import FilterMixin, RestaurantFilterParams
 from app.models.dish import Dish
 from app.models.order import Order
 from app.models.order_item import OrderItem
@@ -10,7 +10,10 @@ from app.models.review import Review
 from app.repositories.base import BaseRepository
 
 
-class RestaurantRepository(BaseRepository[Restaurant]):
+class RestaurantRepository(
+    BaseRepository[Restaurant],
+    FilterMixin,
+):
     model = Restaurant
 
     def __init__(self, db: Session):
@@ -18,15 +21,8 @@ class RestaurantRepository(BaseRepository[Restaurant]):
 
     def get_filtered(
         self,
-        search: str | None = None,
-        is_active: bool | None = None,
-        min_rating: float | None = None,
-        ordering: str | None = None,
-        params: FilterParams | None = None,
+        params: RestaurantFilterParams,
     ):
-        if params is None:
-            params = FilterParams()
-
         review_stats = (
             self.db.query(
                 Review.restaurant_id.label("restaurant_id"),
@@ -55,75 +51,61 @@ class RestaurantRepository(BaseRepository[Restaurant]):
             )
         )
 
-        if search:
-            search_pattern = f"%{search}%"
+        query = self.apply_search(
+            query,
+            Restaurant.name,
+            params.search,
+        )
 
-            query = query.filter(
-                Restaurant.name.ilike(search_pattern),
-            )
+        query = self.apply_is_active(
+            query,
+            Restaurant.is_active,
+            params.is_active,
+        )
 
-        if is_active is not None:
-            query = query.filter(
-                Restaurant.is_active == is_active,
-            )
-
-        if min_rating is not None:
+        if params.min_rating is not None:
             query = query.filter(
                 func.coalesce(
                     review_stats.c.rating,
                     0,
-                ) >= min_rating,
+                ) >= params.min_rating,
             )
 
-        total = query.count()
+        allowed_fields = {
+            "name": Restaurant.name,
+            "created_at": Restaurant.created_at,
+            "rating": func.coalesce(
+                review_stats.c.rating,
+                0,
+            ),
+            "reviews_count": func.coalesce(
+                review_stats.c.reviews_count,
+                0,
+            ),
+        }
 
-        if ordering:
-            descending = ordering.startswith("-")
-            field_name = ordering.lstrip("-")
-
-            allowed_fields = {
-                "name": Restaurant.name,
-                "created_at": Restaurant.created_at,
-                "rating": func.coalesce(
-                    review_stats.c.rating,
-                    0,
-                ),
-                "reviews_count": func.coalesce(
-                    review_stats.c.reviews_count,
-                    0,
-                ),
-            }
-
-            field = allowed_fields.get(field_name)
-
-            if field is not None:
-                if descending:
-                    query = query.order_by(field.desc())
-                else:
-                    query = query.order_by(field.asc())
-        else:
-            query = query.order_by(Restaurant.id)
-
-        rows = (
-            query
-            .offset(params.offset)
-            .limit(params.page_size)
-            .all()
+        query = self.apply_ordering(
+            query,
+            params.ordering,
+            allowed_fields,
+            Restaurant.id,
         )
 
-        return rows, total
+        return self.paginate(
+            query,
+            params,
+        )
 
     def _get_orders_count(
         self,
         restaurant_id: int,
     ) -> int:
         return (
-            self.db.query(func.count(Order.id))
+            self.db.query(Order.id)
             .filter(
                 Order.restaurant_id == restaurant_id,
             )
-            .scalar()
-            or 0
+            .count()
         )
 
     def _get_completed_orders_count(
@@ -131,13 +113,12 @@ class RestaurantRepository(BaseRepository[Restaurant]):
         restaurant_id: int,
     ) -> int:
         return (
-            self.db.query(func.count(Order.id))
+            self.db.query(Order.id)
             .filter(
                 Order.restaurant_id == restaurant_id,
-                Order.status == "COMPLETED",
+                Order.status == "completed",
             )
-            .scalar()
-            or 0
+            .count()
         )
 
     def _get_cancelled_orders_count(
@@ -145,31 +126,33 @@ class RestaurantRepository(BaseRepository[Restaurant]):
         restaurant_id: int,
     ) -> int:
         return (
-            self.db.query(func.count(Order.id))
+            self.db.query(Order.id)
             .filter(
                 Order.restaurant_id == restaurant_id,
-                Order.status == "CANCELLED",
+                Order.status == "cancelled",
             )
-            .scalar()
-            or 0
+            .count()
         )
 
     def _get_revenue(
         self,
         restaurant_id: int,
     ):
-        return (
+        result = (
             self.db.query(
                 func.coalesce(
                     func.sum(Order.total_price),
                     0,
-                ),
+                )
             )
             .filter(
                 Order.restaurant_id == restaurant_id,
+                Order.status == "completed",
             )
             .scalar()
         )
+
+        return result
 
     def _get_average_order_price(
         self,
@@ -180,10 +163,11 @@ class RestaurantRepository(BaseRepository[Restaurant]):
                 func.coalesce(
                     func.avg(Order.total_price),
                     0,
-                ),
+                )
             )
             .filter(
                 Order.restaurant_id == restaurant_id,
+                Order.status == "completed",
             )
             .scalar()
         )
@@ -197,7 +181,7 @@ class RestaurantRepository(BaseRepository[Restaurant]):
                 func.coalesce(
                     func.avg(Review.rating),
                     0,
-                ),
+                )
             )
             .filter(
                 Review.restaurant_id == restaurant_id,
@@ -236,36 +220,36 @@ class RestaurantRepository(BaseRepository[Restaurant]):
         date_from,
         date_to,
     ):
-        orders_query = (
-            self.db.query(Order)
-            .filter(
-                Order.restaurant_id == restaurant_id,
-                Order.created_at >= date_from,
-                Order.created_at <= date_to,
-            )
+        orders_query = self.db.query(Order).filter(
+            Order.restaurant_id == restaurant_id,
+            Order.created_at >= date_from,
+            Order.created_at <= date_to,
         )
 
         orders_count = orders_query.count()
 
         revenue = (
-            orders_query.with_entities(
+            self.db.query(
                 func.coalesce(
                     func.sum(Order.total_price),
                     0,
-                ),
+                )
+            )
+            .filter(
+                Order.restaurant_id == restaurant_id,
+                Order.created_at >= date_from,
+                Order.created_at <= date_to,
             )
             .scalar()
         )
 
         top_dishes = (
             self.db.query(
-                Dish.id.label("dish_id"),
-                Dish.name.label("name"),
+                Dish.id,
+                Dish.name,
+                func.sum(OrderItem.quantity).label("quantity"),
                 func.sum(
-                    OrderItem.quantity,
-                ).label("quantity"),
-                func.sum(
-                    OrderItem.quantity * OrderItem.price,
+                    OrderItem.quantity * OrderItem.price
                 ).label("revenue"),
             )
             .join(
@@ -287,8 +271,8 @@ class RestaurantRepository(BaseRepository[Restaurant]):
             )
             .order_by(
                 func.sum(
-                    OrderItem.quantity,
-                ).desc(),
+                    OrderItem.quantity
+                ).desc()
             )
             .limit(10)
             .all()

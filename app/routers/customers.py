@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -26,15 +26,7 @@ def create_customer(
 ):
     service = CustomerService(db)
 
-    customer = service.create(customer_data)
-
-    if customer is None:
-        raise HTTPException(
-            status_code=409,
-            detail="Customer with this email already exists",
-        )
-
-    return customer
+    return service.create(customer_data)
 
 
 @router.get(
@@ -59,15 +51,7 @@ def get_customer(
 ):
     service = CustomerService(db)
 
-    customer = service.get_by_id(customer_id)
-
-    if customer is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Customer not found",
-        )
-
-    return customer
+    return service.get_by_id(customer_id)
 
 
 @router.patch(
@@ -81,18 +65,10 @@ def update_customer(
 ):
     service = CustomerService(db)
 
-    customer = service.update(
+    return service.update(
         customer_id,
         customer_data,
     )
-
-    if customer is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Customer not found or email already exists",
-        )
-
-    return customer
 
 
 @router.delete(
@@ -104,13 +80,7 @@ def delete_customer(
 ):
     service = CustomerService(db)
 
-    deleted = service.delete(customer_id)
-
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Customer not found",
-        )
+    service.delete(customer_id)
 
     return {
         "message": "Customer deleted successfully",
